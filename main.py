@@ -5,21 +5,15 @@ import redis
 
 import subreddits
 
-open('test', 'w+')
-
 subreddits = subreddits.subreddits
-"""
-subreddits = [
-    'gifs'
-]
-"""
 
 file_type = ".gif"
 
 target_dir = "/Users/daniel.moniz/test/reddit_gifs"
 
 for subreddit in subreddits:
-    reddit_request = requests.get("http://www.reddit.com/r/{}.json".format(subreddit))
+    target_url = "http://www.reddit.com/r/{}.json".format(subreddit)
+    reddit_request = requests.get(target_url)
     json_data = reddit_request.json()
     for post in json_data['data']['children']:
         url = post['data']['url']
@@ -31,6 +25,4 @@ for subreddit in subreddits:
                 file_data = requests.get(url)
                 for chunk in file_data.iter_content(1024):
                     f.write(chunk)
-        break
-    break
 
