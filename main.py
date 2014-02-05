@@ -68,6 +68,8 @@ options_string_template = "?t={time}&limit={limit}&count={count}&show={show}&aft
 
 
 def get_count_updated_request(count, target_url_template, subreddit, options):
+    if count == 0:
+        return ""
     count_options = options.copy()
     max_page_items = 100
     final_count = count % max_page_items
@@ -123,7 +125,7 @@ for subreddit in subreddits:
             continue
         title = post['data']['title']
         file_title = title.replace(' ', '_') + file_type
-        file_title = file_title.replace('/', '')
+        file_title = file_title.replace('/', '')[:50]
         #print file_title
         if not url.endswith(file_type):
             if "imgur" in url:
@@ -137,7 +139,7 @@ for subreddit in subreddits:
                 print "\"{}\" at {} is not a directly-hosted gif or is not on imgur.".format(title, url)
         if url.endswith(file_type):
             if os.path.isfile(os.path.join(target_dir, file_title)):
-                print "\"{}\" already exists.".format(file_title)
+                print u"\"{}\" already exists.".format(file_title)
                 continue
             file_path = os.path.join(target_dir, file_title)
             print "Pulling {} ...".format(url),
