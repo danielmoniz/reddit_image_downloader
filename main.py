@@ -13,14 +13,20 @@ parser = argparse.ArgumentParser(description="Pull image files from reddit.")
 parser.add_argument("--alltime", action="store_true", help="Pull all images from the top, all-time posts.")
 
 parser.add_argument('--limit', default=25, type=int, help="The number of posts to be pulled.")
-parser.add_argument('--sort', default="top", help="Sort by top posts, controversial, etc: top, hot, new, controversial, gilded")
+parser.add_argument('--sort', default="", help="Sort by top posts, controversial, etc: top, hot, new, controversial, gilded")
 parser.add_argument('--time', default="day", help="The time from which to find posts: all, hour, day, month, year")
 parser.add_argument('--show', default="all", help="Which posts to show.")
 parser.add_argument('--count', default=25, type=int, help="The post to start at (paginate).")
 
 parser.add_argument('--target-dir', default="/Users/daniel.moniz/test/reddit_gifs", help="The directory in which to save the images.")
 parser.add_argument('--file-type', default=".gif", help="The extension to look for. Defaults to .gif.")
+
+parser.add_argument('--subreddit', help="The extension to look for. Defaults to .gif.")
+
 args = parser.parse_args()
+
+if args.subreddit:
+    subreddits = [args.subreddit]
 
 # set used variables
 limit = args.limit
@@ -32,12 +38,11 @@ file_type = args.file_type
 target_dir = args.target_dir
 
 if args.alltime:
+    print "YOU HAVE SELECTED ALL-TIME"
     # do not overwrite limit - can use default or specify it
-    sort = "top"
+    sort = "/top"
     time = "all"
     show = "all"
-    count = 0
-    target_dir = "/Users/daniel.moniz/test/top_100_reddit_gifs"
 
 if not os.path.isdir(target_dir):
     print "Directory does not exist. Creating..."
@@ -54,10 +59,35 @@ options = {
     "time": time,
     "show": show,
     "count": count,
+    "after": None,
 }
 
 
-options = "?sort={sort}&t={time}&limit={limit}&count={count}&show={show}".format(**options)
+
+options_string_template = "?t={time}&limit={limit}&count={count}&show={show}&after={after}"
+
+
+def get_count_updated_request(count, target_url_template, subreddit, options):
+    count_options = options.copy()
+    max_page_items = 100
+    final_count = count % max_page_items
+    latest_post_name = None
+    post_list = None
+    final_post_name = None
+
+    for i in range(count)[::max_page_items]:
+        count_options.update(count=i, limit=max_page_items)
+        if latest_post_name:
+            count_options.update(after=latest_post_name)
+        count_options_string = options_string_template.format(**count_options)
+        target_url = target_url_template.format(subreddit, sort, count_options_string)
+        request_data = requests.get(target_url)
+        latest_post_name = request_data.json()['data']['after']
+        post_list = request_data.json()['data']['children']
+
+    final_post_name = post_list[final_count - 1]['data']['name']
+
+    return final_post_name
 
 ignore_list = [
     "http://gifninja.com/animatedgifs/80828/asd.gif",
@@ -76,8 +106,14 @@ imgur_template_file.close()
 missing_pictures = []
 
 for subreddit in subreddits:
-    target_url = "http://www.reddit.com/r/{}.json{}".format(subreddit, options)
+    target_url_template = "http://www.reddit.com/r/{}{}.json{}"
+    starting_post = get_count_updated_request(count, target_url_template, subreddit, options)
+    subreddit_options = options.copy()
+    subreddit_options.update(after=starting_post)
+    options_string = options_string_template.format(**subreddit_options)
+    target_url = target_url_template.format(subreddit, sort, options_string)
     print "{} -> {}".format(target_url, target_dir)
+
     reddit_request = requests.get(target_url)
     json_data = reddit_request.json()
     for post in json_data['data']['children']:
