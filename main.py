@@ -16,7 +16,7 @@ parser.add_argument('--limit', default=25, type=int, help="The number of posts t
 parser.add_argument('--sort', default="", help="Sort by top posts, controversial, etc: top, hot, new, controversial, gilded")
 parser.add_argument('--time', default="day", help="The time from which to find posts: all, hour, day, month, year")
 parser.add_argument('--show', default="all", help="Which posts to show.")
-parser.add_argument('--count', default=25, type=int, help="The post to start at (paginate).")
+parser.add_argument('--count', default=0, type=int, help="The post to start at (paginate).")
 
 parser.add_argument('--target-dir', help="The directory in which to save the images.")
 parser.add_argument("--make-sub-dirs", action="store_true", help="Create a subdirectory for each subreddit.")
@@ -64,7 +64,7 @@ if args.alltime:
 
 def make_dirs(target_dir):
     if not os.path.isdir(target_dir):
-        print "Directory {} does not exist. Creating...".format(target_dir)
+        print u"Directory {} does not exist. Creating...".format(target_dir)
         os.makedirs(target_dir)
 
 make_dirs(target_dir)
@@ -117,6 +117,8 @@ ignore_list = [
     "http://i.imgur.com/Qhkk4.gif",
 ]
 
+failed_subreddits = []
+
 failed_downloads = []
 
 missing_pictures = []
@@ -141,9 +143,15 @@ for subreddit in subreddits:
     subreddit_options.update(after=starting_post)
     options_string = options_string_template.format(**subreddit_options)
     target_url = target_url_template.format(subreddit, sort, options_string)
-    print "{} -> {}".format(target_url, subreddit_target_dir)
+    print u"{} -> {}".format(target_url, subreddit_target_dir)
 
     reddit_request = requests.get(target_url)
+    try:
+        reddit_request.raise_for_status()
+    except requests.exceptions.HTTPError:
+        print "Request to subreddit failed! May not be a valid subreddit."
+        failed_subreddits.append("{}, at url {}".format(subreddit, target_url))
+        continue
     json_data = reddit_request.json()
     for post in json_data['data']['children']:
         url = post['data']['url']
@@ -162,7 +170,7 @@ for subreddit in subreddits:
                     print "url is in ignore list."
                     continue
             else:
-                print "\"{}\" at {} is not a directly-hosted gif or is not on imgur.".format(title, url)
+                print u"\"{}\" at {} is not a directly-hosted gif or is not on imgur.".format(title, url)
         if url.endswith(file_type):
             if os.path.isfile(os.path.join(subreddit_target_dir, file_title)):
                 print u"\"{}\" already exists.".format(file_title)
@@ -186,7 +194,7 @@ for subreddit in subreddits:
                 image_is_missing = False
                 for chunk in image_request.iter_content(1024):
                     f.write(chunk)
-                print "Saved {}".format(file_title)
+                print u"Saved {}".format(file_title)
 
 if failed_downloads:
     print "\nThe following downloads failed: ------"
@@ -197,3 +205,8 @@ if missing_pictures:
     print "\nThe following downloads are missing pictures: ------"
     for download_url in missing_pictures:
         print download_url
+
+if failed_subreddits:
+    print "\nThe following subreddits failed: ------"
+    for subreddit in failed_subreddits:
+        print subreddit
