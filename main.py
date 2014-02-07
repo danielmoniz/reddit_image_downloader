@@ -5,9 +5,9 @@ import socket
 
 import requests
 
-import subreddits
+import config
 
-subreddits = subreddits.subreddits
+subreddits = config.subreddits
 
 parser = argparse.ArgumentParser(description="Pull image files from reddit.")
 parser.add_argument("--alltime", action="store_true", help="Pull all images from the top, all-time posts.")
@@ -18,7 +18,7 @@ parser.add_argument('--time', default="day", help="The time from which to find p
 parser.add_argument('--show', default="all", help="Which posts to show.")
 parser.add_argument('--count', default=25, type=int, help="The post to start at (paginate).")
 
-parser.add_argument('--target-dir', default="/Users/daniel.moniz/test/reddit_gifs", help="The directory in which to save the images.")
+parser.add_argument('--target-dir', help="The directory in which to save the images.")
 parser.add_argument('--file-type', default=".gif", help="The extension to look for. Defaults to .gif.")
 
 parser.add_argument('--subreddit', help="The extension to look for. Defaults to .gif.")
@@ -28,14 +28,23 @@ args = parser.parse_args()
 if args.subreddit:
     subreddits = [args.subreddit]
 
-# set used variables
+# set used variables with defaults
 limit = args.limit
-sort = args.sort
+sort = "/{}".format(args.sort.lstrip('/'))
 time = args.time
 show = args.show
 count = args.count
 file_type = args.file_type
-target_dir = args.target_dir
+
+if 'target_dir' in args and args.target_dir:
+    print "target_dir:", target_dir
+    target_dir = args.target_dir
+else:
+    try:
+        target_dir = config.default_target_dir
+    except AttributeError:
+        print "Please specify --target-dir or add 'default_target_dir' setting to config.py file."
+        exit(1)
 
 if args.alltime:
     print "YOU HAVE SELECTED ALL-TIME"
@@ -44,9 +53,12 @@ if args.alltime:
     time = "all"
     show = "all"
 
-if not os.path.isdir(target_dir):
-    print "Directory does not exist. Creating..."
-    os.makedirs(target_dir)
+def make_dirs(target_dir):
+    if not os.path.isdir(target_dir):
+        print "Directory {} does not exist. Creating...".format(target_dir)
+        os.makedirs(target_dir)
+
+make_dirs(target_dir)
     
 print args
 print "-" * 50
@@ -108,13 +120,19 @@ imgur_template_file.close()
 missing_pictures = []
 
 for subreddit in subreddits:
+    print "-" * 5
+    subreddit_target_dir = target_dir
+    # if config is a tuple, then the target_dir is specified for this subreddit
+    if hasattr(subreddit, '__iter__'):
+        subreddit, subreddit_target_dir = subreddit
+        make_dirs(subreddit_target_dir)
     target_url_template = "http://www.reddit.com/r/{}{}.json{}"
     starting_post = get_count_updated_request(count, target_url_template, subreddit, options)
     subreddit_options = options.copy()
     subreddit_options.update(after=starting_post)
     options_string = options_string_template.format(**subreddit_options)
     target_url = target_url_template.format(subreddit, sort, options_string)
-    print "{} -> {}".format(target_url, target_dir)
+    print "{} -> {}".format(target_url, subreddit_target_dir)
 
     reddit_request = requests.get(target_url)
     json_data = reddit_request.json()
@@ -124,8 +142,7 @@ for subreddit in subreddits:
             print "url is in ignore list."
             continue
         title = post['data']['title']
-        file_title = title.replace(' ', '_') + file_type
-        file_title = file_title.replace('/', '')[:50]
+        file_title = title.replace(' ', '_').replace('/', '').replace('.', '')[:50] + file_type
         #print file_title
         if not url.endswith(file_type):
             if "imgur" in url:
@@ -138,10 +155,10 @@ for subreddit in subreddits:
             else:
                 print "\"{}\" at {} is not a directly-hosted gif or is not on imgur.".format(title, url)
         if url.endswith(file_type):
-            if os.path.isfile(os.path.join(target_dir, file_title)):
+            if os.path.isfile(os.path.join(subreddit_target_dir, file_title)):
                 print u"\"{}\" already exists.".format(file_title)
                 continue
-            file_path = os.path.join(target_dir, file_title)
+            file_path = os.path.join(subreddit_target_dir, file_title)
             print "Pulling {} ...".format(url),
             with open(file_path, 'w+') as f:
                 try:

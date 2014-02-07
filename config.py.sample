@@ -1,0 +1,14 @@
+default_target_dir = "/path/to/your/target/directory/"
+make_sub_dirs = False
+
+# The first two subreddits will be placed in your default target directory, or
+# in the target directory specified when run.
+# The latter two subreddits will be placed in their specified directories (in
+# this case, both in /path/to/animals).
+subreddits = [
+    "gifs",
+    "SpaceGifs",
+    ("AnimalsBeingJerks", "/path/to/animals"),
+    ("AnimalsGIFs", "/path/to/animals"),
+]
+
