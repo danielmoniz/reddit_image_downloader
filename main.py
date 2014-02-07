@@ -19,6 +19,7 @@ parser.add_argument('--show', default="all", help="Which posts to show.")
 parser.add_argument('--count', default=25, type=int, help="The post to start at (paginate).")
 
 parser.add_argument('--target-dir', help="The directory in which to save the images.")
+parser.add_argument("--make-sub-dirs", action="store_true", help="Create a subdirectory for each subreddit.")
 parser.add_argument('--file-type', default=".gif", help="The extension to look for. Defaults to .gif.")
 
 parser.add_argument('--subreddit', help="The extension to look for. Defaults to .gif.")
@@ -46,6 +47,14 @@ else:
         print "Please specify --target-dir or add 'default_target_dir' setting to config.py file."
         exit(1)
 
+if args.make_sub_dirs:
+    make_sub_dirs = True
+else:
+    try:
+        make_sub_dirs = config.make_sub_dirs
+    except AttributeError:
+        make_sub_dirs = False
+
 if args.alltime:
     print "YOU HAVE SELECTED ALL-TIME"
     # do not overwrite limit - can use default or specify it
@@ -60,7 +69,6 @@ def make_dirs(target_dir):
 
 make_dirs(target_dir)
     
-print args
 print "-" * 50
 
 print "Looking for files of type {}.".format(file_type)
@@ -110,22 +118,23 @@ ignore_list = [
 ]
 
 failed_downloads = []
-"""
-imgur_template_file = open("imgur_no_longer_available")
-
-missing_imgur_image_template = imgur_template_file.read(1024)
-imgur_template_file.close()
-"""
 
 missing_pictures = []
 
 for subreddit in subreddits:
     print "-" * 5
+
     subreddit_target_dir = target_dir
+
     # if config is a tuple, then the target_dir is specified for this subreddit
+    has_dir_config = False
     if hasattr(subreddit, '__iter__'):
+        has_dir_config = True
         subreddit, subreddit_target_dir = subreddit
-        make_dirs(subreddit_target_dir)
+    if make_sub_dirs and not has_dir_config:
+        subreddit_target_dir = os.path.join(subreddit_target_dir, subreddit)
+    make_dirs(subreddit_target_dir)
+
     target_url_template = "http://www.reddit.com/r/{}{}.json{}"
     starting_post = get_count_updated_request(count, target_url_template, subreddit, options)
     subreddit_options = options.copy()
@@ -160,6 +169,7 @@ for subreddit in subreddits:
                 continue
             file_path = os.path.join(subreddit_target_dir, file_title)
             print "Pulling {} ...".format(url),
+
             with open(file_path, 'w+') as f:
                 try:
                     image_request = requests.get(url)
@@ -174,17 +184,6 @@ for subreddit in subreddits:
                         os.remove(file_path)
                     continue
                 image_is_missing = False
-                """
-                # This code is meant for determining if a picture does not
-                # exist on imgur (ie. it provides a standard image).
-                for chunk in image_request.iter_content(1024):
-                    if chunk == missing_imgur_image_template:
-                        image_is_missing = True
-                    break
-                if image_is_missing:
-                    missing_pictures.append(url)
-                    continue
-                """
                 for chunk in image_request.iter_content(1024):
                     f.write(chunk)
                 print "Saved {}".format(file_title)
