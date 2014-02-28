@@ -38,8 +38,9 @@ count = args.count
 file_type = args.file_type
 
 if 'target_dir' in args and args.target_dir:
-    print "target_dir:", target_dir
+    print "target_dir:", args.target_dir
     target_dir = args.target_dir
+    target_dir_specified = True
 else:
     try:
         target_dir = config.default_target_dir
@@ -132,7 +133,10 @@ for subreddit in subreddits:
     has_dir_config = False
     if hasattr(subreddit, '__iter__'):
         has_dir_config = True
-        subreddit, subreddit_target_dir = subreddit
+        if not target_dir_specified:
+            subreddit, subreddit_target_dir = subreddit
+        else:
+            subreddit, _ = subreddit
     if make_sub_dirs and not has_dir_config:
         subreddit_target_dir = os.path.join(subreddit_target_dir, subreddit)
     make_dirs(subreddit_target_dir)
