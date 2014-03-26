@@ -19,7 +19,9 @@ parser.add_argument('--show', default="all", help="Which posts to show.")
 parser.add_argument('--count', default=0, type=int, help="The post to start at (paginate).")
 
 parser.add_argument('--target-dir', help="The directory in which to save the images.")
-parser.add_argument("--make-sub-dirs", action="store_true", help="Create a subdirectory for each subreddit.")
+parser.add_argument("--make-sub-dirs", action="store_true", help="Create a subdirectory for each subreddit if specified in config file.")
+parser.add_argument("--make-extra-sub-dirs", action="store_true", help="Create a subdirectory for each subreddit.")
+parser.add_argument("--nsfw-only", action="store_true", help="Not yet implemented. Search only your nsfw subreddits.")
 parser.add_argument('--file-type', default=".gif", help="The extension to look for. Defaults to .gif.")
 
 parser.add_argument('--subreddit', help="The extension to look for. Defaults to .gif.")
@@ -56,12 +58,18 @@ else:
     except AttributeError:
         make_sub_dirs = False
 
+make_extra_sub_dirs = False
+if args.make_extra_sub_dirs:
+    make_extra_sub_dirs = True
+
+use_rank = False
 if args.alltime:
     print "YOU HAVE SELECTED ALL-TIME"
     # do not overwrite limit - can use default or specify it
     sort = "/top"
     time = "all"
     show = "all"
+    use_rank = True
 
 def make_dirs(target_dir):
     if not os.path.isdir(target_dir):
@@ -124,6 +132,7 @@ failed_downloads = []
 
 missing_pictures = []
 
+rank = 0
 for subreddit in subreddits:
     print "-" * 5
 
@@ -133,11 +142,11 @@ for subreddit in subreddits:
     has_dir_config = False
     if hasattr(subreddit, '__iter__'):
         has_dir_config = True
-        if not target_dir_specified:
+        if make_sub_dirs:
             subreddit, subreddit_target_dir = subreddit
         else:
             subreddit, _ = subreddit
-    if make_sub_dirs and not has_dir_config:
+    if make_extra_sub_dirs and (not has_dir_config or (has_dir_config and target_dir_specified)):
         subreddit_target_dir = os.path.join(subreddit_target_dir, subreddit)
     make_dirs(subreddit_target_dir)
 
@@ -156,14 +165,18 @@ for subreddit in subreddits:
         print "Request to subreddit failed! May not be a valid subreddit."
         failed_subreddits.append("{}, at url {}".format(subreddit, target_url))
         continue
+
     json_data = reddit_request.json()
     for post in json_data['data']['children']:
         url = post['data']['url']
         if url in ignore_list:
             print "url is in ignore list."
             continue
+        rank += 1
         title = post['data']['title']
         file_title = title.replace(' ', '_').replace('/', '').replace('.', '')[:50] + file_type
+        if use_rank:
+            file_title = "{}. {}".format(rank, file_title)
         #print file_title
         if not url.endswith(file_type):
             if "imgur" in url:
