@@ -4,6 +4,8 @@ import argparse
 import socket
 
 import requests
+import imghdr
+import bs4
 
 import config
 
@@ -180,6 +182,10 @@ for subreddit in subreddits:
         #print file_title
         if not url.endswith(file_type):
             if "imgur" in url:
+                # check if album - if so, move on immediately
+                if url.rsplit('/')[-2] == 'a':
+                    print "URL is an album. Skipping and moving to next item."
+                    continue
                 image_uri = url.rsplit('/', 1)[-1]
                 url = "http://i.imgur.com/{}{}".format(image_uri, file_type)
                 print "Redirecting to imgur...",
@@ -212,6 +218,18 @@ for subreddit in subreddits:
                 for chunk in image_request.iter_content(1024):
                     f.write(chunk)
                 print u"Saved {}".format(file_title)
+
+            """
+            actual_file_type = imghdr.what(file_path)
+            if actual_file_type and actual_file_type != file_path[-3:]:
+                print "TESTING"
+                print file_path, actual_file_type
+                rename_to = "{}.{}".format(file_path, actual_file_type)
+                print rename_to
+                os.rename(file_path, rename_to)
+                print "Renamed file to correct extension!"
+                print "END TESTING"
+            """
 
 if failed_downloads:
     print "\nThe following downloads failed: ------"
