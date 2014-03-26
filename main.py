@@ -24,7 +24,7 @@ parser.add_argument('--target-dir', help="The directory in which to save the ima
 parser.add_argument("--make-sub-dirs", action="store_true", help="Create a subdirectory for each subreddit if specified in config file.")
 parser.add_argument("--make-extra-sub-dirs", action="store_true", help="Create a subdirectory for each subreddit.")
 parser.add_argument("--nsfw-only", action="store_true", help="Not yet implemented. Search only your nsfw subreddits.")
-parser.add_argument('--file-type', default=".gif", help="The extension to look for. Defaults to .gif.")
+#parser.add_argument('--file-type', default=".gif", help="The extension to look for. Defaults to .gif.")
 
 parser.add_argument('--subreddit', help="The extension to look for. Defaults to .gif.")
 
@@ -39,7 +39,7 @@ sort = "/{}".format(args.sort.lstrip('/'))
 time = args.time
 show = args.show
 count = args.count
-file_type = args.file_type
+#file_type = args.file_type
 
 if 'target_dir' in args and args.target_dir:
     print "target_dir:", args.target_dir
@@ -82,7 +82,8 @@ make_dirs(target_dir)
     
 print "-" * 50
 
-print "Looking for files of type {}.".format(file_type)
+#print "Looking for files of type {}.".format(file_type)
+print "Looking for image files."
 
 options = {
     "limit": limit,
@@ -121,6 +122,27 @@ def get_count_updated_request(count, target_url_template, subreddit, options):
     final_post_name = post_list[final_count - 1]['data']['name']
 
     return final_post_name
+
+def has_extension(url):
+    if url[-4] == '.' or url[-5] == '.':
+        return True
+    return False
+
+def get_extension(url):
+    uri = url.split('/')[-1]
+    try:
+        extension_start = uri.index('.')
+    except ValueError:
+        return False
+    extension = uri[extension_start:]
+    return extension
+
+def has_acceptable_extension(url):
+    """Assumes url has an extension."""
+    extension = get_extension(url)
+    if extension in ["jpg", "jpeg", "gif", "png"]:
+        return True
+    return False
 
 ignore_list = [
     "http://gifninja.com/animatedgifs/80828/asd.gif",
@@ -176,29 +198,55 @@ for subreddit in subreddits:
             continue
         rank += 1
         title = post['data']['title']
-        file_title = title.replace(' ', '_').replace('/', '').replace('.', '')[:50] + file_type
+        file_title = title.replace(' ', '_').replace('/', '').replace('.', '')[:50]
         if use_rank:
             file_title = "{}. {}".format(rank, file_title)
         #print file_title
-        if not url.endswith(file_type):
+        #print url
+        #if not url.endswith(file_type):
+        if not has_extension(url):
             if "imgur" in url:
                 # check if album - if so, move on immediately
                 if url.rsplit('/')[-2] == 'a':
                     print "URL is an album. Skipping and moving to next item."
                     continue
+                print "Redirecting to imgur...",
+                imgur_html = requests.get(url).text
+                imgur_soup = bs4.BeautifulSoup(imgur_html)
+                image_div = imgur_soup.find("div", {"class": "image" })
+                print "URL:", url
+                if "m.imgur" in url:
+                    print "Mobile links not yet supported. Skipping image."
+                    continue
+                url = "http:" + image_div.find('img')['src']
+                file_extension = url[-3:]
+                #TEST - overwrite filetype!!
+                #file_type = actual_file_type
+
+                """
                 image_uri = url.rsplit('/', 1)[-1]
                 url = "http://i.imgur.com/{}{}".format(image_uri, file_type)
-                print "Redirecting to imgur...",
+                """
                 if url in ignore_list:
                     print "url is in ignore list."
                     continue
             else:
                 print u"\"{}\" at {} is not a directly-hosted gif or is not on imgur.".format(title, url)
-        if url.endswith(file_type):
+                continue
+
+        #if url.endswith(file_type):
+        # TEST
+        if 1==1 or url.endswith(file_type):
+            file_extension = get_extension(url)
+            """
+            if not has_acceptable_extension(url):
+                print "Not an accepted extension."
+                continue
+            """
             if os.path.isfile(os.path.join(subreddit_target_dir, file_title)):
                 print u"\"{}\" already exists.".format(file_title)
                 continue
-            file_path = os.path.join(subreddit_target_dir, file_title)
+            file_path = os.path.join(subreddit_target_dir, "{}.{}".format(file_title, file_extension))
             print "Pulling {} ...".format(url),
 
             with open(file_path, 'w+') as f:
