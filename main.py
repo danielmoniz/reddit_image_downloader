@@ -29,10 +29,10 @@ parser.add_argument('--subreddits', nargs="*", help="The subreddits to search. O
 
 args = parser.parse_args()
 
-if args.subreddit:
-    subreddits = [args.subreddit]
-    if not isinstance(args.subreddit, basestring):
-        subreddits = args.subreddit
+if args.subreddits:
+    subreddits = [args.subreddits]
+    if not isinstance(args.subreddits, basestring):
+        subreddits = args.subreddits
 
 # set used variables with defaults
 limit = args.limit
