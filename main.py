@@ -4,7 +4,6 @@ import argparse
 import socket
 
 import requests
-import imghdr
 import bs4
 
 import config
@@ -26,12 +25,14 @@ parser.add_argument("--make-extra-sub-dirs", action="store_true", help="Create a
 parser.add_argument("--nsfw-only", action="store_true", help="Not yet implemented. Search only your nsfw subreddits.")
 #parser.add_argument('--file-type', default=".gif", help="The extension to look for. Defaults to .gif.")
 
-parser.add_argument('--subreddit', help="The extension to look for. Defaults to .gif.")
+parser.add_argument('--subreddits', nargs="*", help="The subreddits to search. Overwrites subreddits from config.")
 
 args = parser.parse_args()
 
 if args.subreddit:
     subreddits = [args.subreddit]
+    if not isinstance(args.subreddit, basestring):
+        subreddits = args.subreddit
 
 # set used variables with defaults
 limit = args.limit
@@ -134,7 +135,7 @@ def get_extension(url):
         extension_start = uri.index('.')
     except ValueError:
         return False
-    extension = uri[extension_start:]
+    extension = uri[extension_start + 1:]
     return extension
 
 def has_acceptable_extension(url):
@@ -182,10 +183,12 @@ for subreddit in subreddits:
     target_url = target_url_template.format(subreddit, sort, options_string)
     print u"{} -> {}".format(target_url, subreddit_target_dir)
 
-    reddit_request = requests.get(target_url)
+    headers = { 'User-Agent': 'reddit image downloader by ParagonRG' }
+    reddit_request = requests.get(target_url, headers=headers)
     try:
         reddit_request.raise_for_status()
-    except requests.exceptions.HTTPError:
+    except requests.exceptions.HTTPError as e:
+        print e
         print "Request to subreddit failed! May not be a valid subreddit."
         failed_subreddits.append("{}, at url {}".format(subreddit, target_url))
         continue
@@ -198,16 +201,17 @@ for subreddit in subreddits:
             continue
         rank += 1
         title = post['data']['title']
-        file_title = title.replace(' ', '_').replace('/', '').replace('.', '')[:50]
+        import re
+        file_title = re.sub("[_.,]", '', title)[:50]
+        file_title = re.sub("[/ ]", '_', title)[:50]
         if use_rank:
-            file_title = "{}. {}".format(rank, file_title)
-        #print file_title
-        #print url
-        #if not url.endswith(file_type):
+            rank_string = str(rank).zfill(3)
+            file_title = u"{}. {}".format(rank_string, file_title)
+
         if not has_extension(url):
             if "imgur" in url:
                 # check if album - if so, move on immediately
-                if url.rsplit('/')[-2] == 'a':
+                if 'a' in url.rsplit('/'):
                     print "URL is an album. Skipping and moving to next item."
                     continue
                 print "Redirecting to imgur...",
@@ -218,7 +222,11 @@ for subreddit in subreddits:
                 if "m.imgur" in url:
                     print "Mobile links not yet supported. Skipping image."
                     continue
-                url = "http:" + image_div.find('img')['src']
+                try:
+                    url = "http:" + image_div.find('img')['src']
+                except AttributeError:
+                    print "Page cannot be read. Skipping."
+                    continue
                 file_extension = url[-3:]
                 #TEST - overwrite filetype!!
                 #file_type = actual_file_type
@@ -243,10 +251,12 @@ for subreddit in subreddits:
                 print "Not an accepted extension."
                 continue
             """
+            print "file title:", file_title
+            file_title = u"{}.{}".format(file_title, file_extension)
             if os.path.isfile(os.path.join(subreddit_target_dir, file_title)):
                 print u"\"{}\" already exists.".format(file_title)
                 continue
-            file_path = os.path.join(subreddit_target_dir, "{}.{}".format(file_title, file_extension))
+            file_path = os.path.join(subreddit_target_dir, file_title)
             print "Pulling {} ...".format(url),
 
             with open(file_path, 'w+') as f:
@@ -266,18 +276,6 @@ for subreddit in subreddits:
                 for chunk in image_request.iter_content(1024):
                     f.write(chunk)
                 print u"Saved {}".format(file_title)
-
-            """
-            actual_file_type = imghdr.what(file_path)
-            if actual_file_type and actual_file_type != file_path[-3:]:
-                print "TESTING"
-                print file_path, actual_file_type
-                rename_to = "{}.{}".format(file_path, actual_file_type)
-                print rename_to
-                os.rename(file_path, rename_to)
-                print "Renamed file to correct extension!"
-                print "END TESTING"
-            """
 
 if failed_downloads:
     print "\nThe following downloads failed: ------"
