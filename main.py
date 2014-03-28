@@ -136,6 +136,12 @@ def get_extension(url):
     except ValueError:
         return False
     extension = uri[extension_start + 1:]
+    # remove extra url arguments
+    try:
+        extension_end = extension.index('?')
+        extension = extension[:extension_end]
+    except ValueError:
+        pass
     return extension
 
 def has_acceptable_extension(url):
@@ -183,7 +189,7 @@ for subreddit in subreddits:
     target_url = target_url_template.format(subreddit, sort, options_string)
     print u"{} -> {}".format(target_url, subreddit_target_dir)
 
-    headers = { 'User-Agent': 'reddit image downloader by ParagonRG' }
+    headers = { 'User-Agent': 'reddit image downloader/0.1 by ParagonRG' }
     reddit_request = requests.get(target_url, headers=headers)
     try:
         reddit_request.raise_for_status()
