@@ -116,9 +116,10 @@ def get_count_updated_request(count, target_url_template, subreddit, options):
             count_options.update(after=latest_post_name)
         count_options_string = options_string_template.format(**count_options)
         target_url = target_url_template.format(subreddit, sort, count_options_string)
-        request_data = requests.get(target_url)
-        latest_post_name = request_data.json()['data']['after']
-        post_list = request_data.json()['data']['children']
+        reddit_request = request_to_reddit(target_url)
+        json_stuff = reddit_request.json()
+        latest_post_name = reddit_request.json()['data']['after']
+        post_list = reddit_request.json()['data']['children']
 
     final_post_name = post_list[final_count - 1]['data']['name']
 
@@ -151,6 +152,11 @@ def has_acceptable_extension(url):
         return True
     return False
 
+def request_to_reddit(target_url):
+    headers = { 'User-Agent': 'reddit image downloader/0.1 by ParagonRG' }
+    reddit_request = requests.get(target_url, headers=headers)
+    return reddit_request
+
 ignore_list = [
     "http://gifninja.com/animatedgifs/80828/asd.gif",
     "http://i.imgur.com/Tm1s6.gif",
@@ -163,8 +169,8 @@ failed_downloads = []
 
 missing_pictures = []
 
-rank = 0
 for subreddit in subreddits:
+    rank = count
     print "-" * 5
 
     subreddit_target_dir = target_dir
@@ -189,8 +195,7 @@ for subreddit in subreddits:
     target_url = target_url_template.format(subreddit, sort, options_string)
     print u"{} -> {}".format(target_url, subreddit_target_dir)
 
-    headers = { 'User-Agent': 'reddit image downloader/0.1 by ParagonRG' }
-    reddit_request = requests.get(target_url, headers=headers)
+    reddit_request = request_to_reddit(target_url)
     try:
         reddit_request.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -257,7 +262,6 @@ for subreddit in subreddits:
                 print "Not an accepted extension."
                 continue
             """
-            print "file title:", file_title
             file_title = u"{}.{}".format(file_title, file_extension)
             if os.path.isfile(os.path.join(subreddit_target_dir, file_title)):
                 print u"\"{}\" already exists.".format(file_title)
