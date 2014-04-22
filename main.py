@@ -116,7 +116,7 @@ def get_count_updated_request(count, target_url_template, subreddit, options):
             count_options.update(after=latest_post_name)
         count_options_string = options_string_template.format(**count_options)
         target_url = target_url_template.format(subreddit, sort, count_options_string)
-        reddit_request = request_to_reddit(target_url)
+        reddit_request = make_reddit_request(target_url)
         json_stuff = reddit_request.json()
         latest_post_name = reddit_request.json()['data']['after']
         post_list = reddit_request.json()['data']['children']
@@ -152,10 +152,35 @@ def has_acceptable_extension(url):
         return True
     return False
 
-def request_to_reddit(target_url):
+def make_reddit_request(target_url):
     headers = { 'User-Agent': 'reddit image downloader/0.1 by ParagonRG' }
     reddit_request = requests.get(target_url, headers=headers)
     return reddit_request
+
+def download_image(image_url):
+    try:
+        image_request = requests.get(image_url)
+        image_request.raise_for_status()
+    except requests.exceptions.HTTPError:
+        print "No image at this location: {}".format(image_url)
+        return
+    except requests.exceptions.ConnectionError, socket.error:
+        print "Failed to download. URL is: {}".format(image_url)
+        failed_downloads.append(image_url)
+        return
+    return image_request
+
+def save_image(image, file_path):
+    """
+    if os.path.isfile(file_path):
+        print "Error: cannot save image; file already exists."
+        return False
+    """
+    with open(file_path, 'w+') as f:
+        for chunk in image.iter_content(1024):
+            f.write(chunk)
+    print u"Saved {}".format(file_title)
+    return True
 
 ignore_list = [
     "http://gifninja.com/animatedgifs/80828/asd.gif",
@@ -195,7 +220,7 @@ for subreddit in subreddits:
     target_url = target_url_template.format(subreddit, sort, options_string)
     print u"{} -> {}".format(target_url, subreddit_target_dir)
 
-    reddit_request = request_to_reddit(target_url)
+    reddit_request = make_reddit_request(target_url)
     try:
         reddit_request.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -269,23 +294,11 @@ for subreddit in subreddits:
             file_path = os.path.join(subreddit_target_dir, file_title)
             print "Pulling {} ...".format(url),
 
-            with open(file_path, 'w+') as f:
-                try:
-                    image_request = requests.get(url)
-                    image_request.raise_for_status()
-                except requests.exceptions.HTTPError:
-                    print "No image at this location: {}".format(url)
-                    continue
-                except requests.exceptions.ConnectionError, socket.error:
-                    print "Failed to download. URL is: {}".format(url)
-                    failed_downloads.append(url)
-                    if os.path.isfile(file_path):
-                        os.remove(file_path)
-                    continue
-                image_is_missing = False
-                for chunk in image_request.iter_content(1024):
-                    f.write(chunk)
-                print u"Saved {}".format(file_title)
+            image = download_image(url)
+            if not image:
+                continue
+            save_image(image, file_path)
+
 
 if failed_downloads:
     print "\nThe following downloads failed: ------"
