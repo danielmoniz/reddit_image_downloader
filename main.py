@@ -2,6 +2,7 @@ import json
 import os
 import argparse
 import socket
+import re
 
 import requests
 import bs4
@@ -182,6 +183,70 @@ def save_image(image, file_path):
     print u"Saved {}".format(file_title)
     return True
 
+
+def get_single_image_url_from_imgur(url):
+    # check if album - if so, move on immediately
+    if 'a' in url.rsplit('/'):
+        print "URL is an album. Skipping and moving to next item."
+        return False
+    print "Redirecting to imgur...",
+    imgur_html = requests.get(url).text
+    imgur_soup = bs4.BeautifulSoup(imgur_html)
+    image_div = imgur_soup.find("div", {"class": "image" })
+    print "URL:", url
+    if "m.imgur" in url:
+        print "Mobile links not yet supported. Skipping image."
+        return False
+    try:
+        url = "http:" + image_div.find('img')['src']
+    except AttributeError:
+        print "Page cannot be read. Skipping."
+        return False
+
+    return url
+
+
+def get_scrubbed_file_title(title, use_rank, rank=0):
+    file_title = re.sub("[_.,]", '', title)[:50]
+    file_title = re.sub("[/ ]", '_', title)[:50]
+    if use_rank:
+        rank_string = str(rank).zfill(3)
+        file_title = u"{}. {}".format(rank_string, file_title)
+    return file_title
+
+
+def get_target_file_path(url, file_title):
+    file_extension = get_extension(url)
+    """
+    if not has_acceptable_extension(url):
+        print "Not an accepted extension."
+        continue
+    """
+    file_title = u"{}.{}".format(file_title, file_extension)
+    if os.path.isfile(os.path.join(subreddit_target_dir, file_title)):
+        print u"\"{}\" already exists.".format(file_title)
+        return False
+    file_path = os.path.join(subreddit_target_dir, file_title)
+    print "Pulling {} ...".format(url),
+
+    return file_path
+
+def save_image_from_url(url, file_path):
+    if not url:
+        print "Failed to get URL for image(s)."
+        return False
+    if url in ignore_list:
+        print "URL is in ignore list."
+        return False
+    if not file_path:
+        return False
+
+    image = download_image(url)
+    if not image:
+        return False
+    save_image(image, file_path)
+
+
 ignore_list = [
     "http://gifninja.com/animatedgifs/80828/asd.gif",
     "http://i.imgur.com/Tm1s6.gif",
@@ -232,72 +297,20 @@ for subreddit in subreddits:
     json_data = reddit_request.json()
     for post in json_data['data']['children']:
         url = post['data']['url']
-        if url in ignore_list:
-            print "url is in ignore list."
-            continue
         rank += 1
+
         title = post['data']['title']
-        import re
-        file_title = re.sub("[_.,]", '', title)[:50]
-        file_title = re.sub("[/ ]", '_', title)[:50]
-        if use_rank:
-            rank_string = str(rank).zfill(3)
-            file_title = u"{}. {}".format(rank_string, file_title)
+        file_title = get_scrubbed_file_title(title, use_rank, rank=rank)
 
         if not has_extension(url):
             if "imgur" in url:
-                # check if album - if so, move on immediately
-                if 'a' in url.rsplit('/'):
-                    print "URL is an album. Skipping and moving to next item."
-                    continue
-                print "Redirecting to imgur...",
-                imgur_html = requests.get(url).text
-                imgur_soup = bs4.BeautifulSoup(imgur_html)
-                image_div = imgur_soup.find("div", {"class": "image" })
-                print "URL:", url
-                if "m.imgur" in url:
-                    print "Mobile links not yet supported. Skipping image."
-                    continue
-                try:
-                    url = "http:" + image_div.find('img')['src']
-                except AttributeError:
-                    print "Page cannot be read. Skipping."
-                    continue
-                file_extension = url[-3:]
-                #TEST - overwrite filetype!!
-                #file_type = actual_file_type
-
-                """
-                image_uri = url.rsplit('/', 1)[-1]
-                url = "http://i.imgur.com/{}{}".format(image_uri, file_type)
-                """
-                if url in ignore_list:
-                    print "url is in ignore list."
-                    continue
+                url = get_single_image_url_from_imgur(url)
             else:
-                print u"\"{}\" at {} is not a directly-hosted gif or is not on imgur.".format(title, url)
+                print u"\"{}\" at {} is not a directly-hosted image or is not a single image on imgur.".format(title, url)
                 continue
 
-        #if url.endswith(file_type):
-        # TEST
-        if 1==1 or url.endswith(file_type):
-            file_extension = get_extension(url)
-            """
-            if not has_acceptable_extension(url):
-                print "Not an accepted extension."
-                continue
-            """
-            file_title = u"{}.{}".format(file_title, file_extension)
-            if os.path.isfile(os.path.join(subreddit_target_dir, file_title)):
-                print u"\"{}\" already exists.".format(file_title)
-                continue
-            file_path = os.path.join(subreddit_target_dir, file_title)
-            print "Pulling {} ...".format(url),
-
-            image = download_image(url)
-            if not image:
-                continue
-            save_image(image, file_path)
+        file_path = get_target_file_path(url, file_title)
+        save_image_from_url(url, file_path)
 
 
 if failed_downloads:
