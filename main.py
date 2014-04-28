@@ -180,30 +180,69 @@ def save_image(image, file_path):
     with open(file_path, 'w+') as f:
         for chunk in image.iter_content(1024):
             f.write(chunk)
-    print u"Saved {}".format(file_title)
+    print u"Saved {}".format(file_path.split('/')[-1])
     return True
 
 
 def get_single_image_url_from_imgur(url):
-    # check if album - if so, move on immediately
-    if 'a' in url.rsplit('/'):
-        print "URL is an album. Skipping and moving to next item."
-        return False
     print "Redirecting to imgur...",
+    print "URL:", url
+    if "m.imgur" in url:
+        print "Mobile imgur links not yet supported. Skipping image."
+        return False
     imgur_html = requests.get(url).text
     imgur_soup = bs4.BeautifulSoup(imgur_html)
     image_div = imgur_soup.find("div", {"class": "image" })
-    print "URL:", url
-    if "m.imgur" in url:
-        print "Mobile links not yet supported. Skipping image."
-        return False
     try:
         url = "http:" + image_div.find('img')['src']
     except AttributeError:
         print "Page cannot be read. Skipping."
         return False
-
     return url
+
+
+def get_image_urls_from_imgur_album(url):
+    if 'a' not in url.rsplit('/'):
+        print url.split('/')
+        print "Error: album expected. URL is NOT an album."
+        return False
+    if "m.imgur" in url:
+        print "Mobile imgur links not yet supported. Skipping image."
+        return False
+    print "Redirecting to imgur...",
+    standard_album_type = True
+    imgur_html = requests.get(url).text
+    imgur_soup = bs4.BeautifulSoup(imgur_html)
+    image_divs = imgur_soup.find_all("div", {"class": "image" })
+    urls = []
+    print "Retrieving urls from page..."
+    for image_div in image_divs:
+        try:
+            url = "http:" + image_div.find('img')['data-src']
+        except AttributeError:
+            print "Current image cannot be read. Skipping."
+            # skip current image on page
+            continue
+        except KeyError:
+            # Could be the other (click-through) type of album.
+            url = 'test'
+            standard_album_type = False
+            break
+        urls.append(url)
+
+    if not standard_album_type:
+        # try alternatie album type - click-through album
+        image_wrapper = imgur_soup.find("div", {"class": "thumbs-carousel"})
+        images = image_wrapper.find_all("img")
+        for image in images:
+            url = "http:" + image['data-src']
+            # Strip 's' from filename - it makes image small
+            uri = url.split('/')[-1]
+            uri_split = uri.split('.')
+            new_uri = ".".join([uri_split[0][:-1], uri_split[1]])
+            url = "/".join(url.split('/')[:-1] + [new_uri])
+            urls.append(url)
+    return urls
 
 
 def get_scrubbed_file_title(title, use_rank, rank=0):
@@ -215,7 +254,7 @@ def get_scrubbed_file_title(title, use_rank, rank=0):
     return file_title
 
 
-def get_target_file_path(url, file_title):
+def get_target_file_path(url, file_title, subfolder=None):
     file_extension = get_extension(url)
     """
     if not has_acceptable_extension(url):
@@ -223,12 +262,15 @@ def get_target_file_path(url, file_title):
         continue
     """
     file_title = u"{}.{}".format(file_title, file_extension)
-    if os.path.isfile(os.path.join(subreddit_target_dir, file_title)):
+    file_path = os.path.join(subreddit_target_dir, file_title)
+    if subfolder:
+        dir_path = os.path.join(subreddit_target_dir, subfolder)
+        file_path = os.path.join(dir_path, file_title)
+        make_dirs(dir_path)
+    if os.path.isfile(file_path):
         print u"\"{}\" already exists.".format(file_title)
         return False
-    file_path = os.path.join(subreddit_target_dir, file_title)
     print "Pulling {} ...".format(url),
-
     return file_path
 
 def save_image_from_url(url, file_path):
@@ -248,7 +290,6 @@ def save_image_from_url(url, file_path):
 
 
 ignore_list = [
-    "http://gifninja.com/animatedgifs/80828/asd.gif",
     "http://i.imgur.com/Tm1s6.gif",
     "http://i.imgur.com/Qhkk4.gif",
 ]
@@ -304,11 +345,29 @@ for subreddit in subreddits:
 
         if not has_extension(url):
             if "imgur" in url:
+                # check if album - if so, move on immediately
+                if 'a' in url.rsplit('/'):
+                    url_list = get_image_urls_from_imgur_album(url)
+                    if not url_list:
+                        continue
+                    list_item = 0
+                    for url in url_list:
+                        list_item += 1
+                        if not url:
+                            print "Error: URL in list is empty."
+                            continue
+                        list_item_str = str(list_item).zfill(3)
+                        new_file_title = file_title +  " - {}".format(list_item_str)
+                        file_path = get_target_file_path(url, new_file_title, file_title)
+                        save_image_from_url(url, file_path)
+                    continue
                 url = get_single_image_url_from_imgur(url)
             else:
                 print u"\"{}\" at {} is not a directly-hosted image or is not a single image on imgur.".format(title, url)
                 continue
 
+        if not url:
+            continue
         file_path = get_target_file_path(url, file_title)
         save_image_from_url(url, file_path)
 
