@@ -184,6 +184,24 @@ def save_image(image, file_path):
     return True
 
 
+def get_videos_from_gfycat(url):
+    gfycat_html = requests.get(url).text
+    gfycat_soup = bs4.BeautifulSoup(gfycat_html)
+    video_tags = gfycat_soup.find_all("video", {"class": "gfyVid" })
+    urls = []
+    print "Retrieving urls from page..."
+    for video_tag in video_tags:
+        try:
+            source_tag = video_tag.find('source', {"id": "mp4source"})
+            url = source_tag['src']
+            url = "http:" + url
+        except AttributeError:
+            print "Current image cannot be read. Skipping."
+            # skip current image on page
+            continue
+        urls.append(url)
+    return urls
+
 def get_single_image_url_from_imgur(url):
     print "Redirecting to imgur...",
     print "URL:", url
@@ -362,6 +380,26 @@ for subreddit in subreddits:
                         save_image_from_url(url, file_path)
                     continue
                 url = get_single_image_url_from_imgur(url)
+            elif "gfycat" in url:
+                url_list = get_videos_from_gfycat(url)
+                if not url_list:
+                    continue
+                if len(url_list) == 1:
+                    url = url_list[0]
+                    file_path = get_target_file_path(url, file_title)
+                    save_image_from_url(url, file_path)
+                    continue
+                list_item = 0
+                for url in url_list:
+                    list_item += 1
+                    if not url:
+                        print "Error: URL in list is empty."
+                        continue
+                    list_item_str = str(list_item).zfill(3)
+                    new_file_title = file_title +  " - {}".format(list_item_str)
+                    file_path = get_target_file_path(url, new_file_title, file_title)
+                    save_image_from_url(url, file_path)
+                continue
             else:
                 print u"\"{}\" at {} is not a directly-hosted image or is not a single image on imgur.".format(title, url)
                 continue
