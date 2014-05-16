@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import argparse
@@ -24,6 +25,7 @@ parser.add_argument('--target-dir', help="The directory in which to save the ima
 parser.add_argument("--make-sub-dirs", action="store_true", help="Create a subdirectory for each subreddit if specified in config file.")
 parser.add_argument("--make-extra-sub-dirs", action="store_true", help="Create a subdirectory for each subreddit.")
 parser.add_argument("--nsfw-only", action="store_true", help="Not yet implemented. Search only your nsfw subreddits.")
+parser.add_argument("--new-only", action="store_true", help="Not yet implemented. Download only images you don't have in the specified directory.")
 #parser.add_argument('--file-type', default=".gif", help="The extension to look for. Defaults to .gif.")
 
 parser.add_argument('--subreddits', nargs="*", help="The subreddits to search. Overwrites subreddits from config.")
@@ -74,6 +76,36 @@ if args.alltime:
     time = "all"
     show = "all"
     use_rank = True
+
+def strip_rank_from_title(title):
+    return title.lstrip("0123456789. ")
+
+viewed_posts = []
+open("viewed_posts.txt", 'a').close()
+with open("viewed_posts.txt", 'r') as f:
+    viewed_posts = f.read().split('\n')
+with open("viewed_posts.txt", "a") as f:
+    f.write("\n{}\nDate/time started: {}\n".format("*"*16, datetime.datetime.now()))
+
+
+new_only = False
+if args.new_only:
+    new_only = True
+"""
+pics_list = []
+if args.new_only:
+    print hasattr(config, 'master_dir')
+    if hasattr(config, 'master_dir'):
+        new_only = True
+        print "Downloading only images not found in {}".format(config.master_dir)
+        for root, dirnames, filenames in os.walk("/Users/daniel.moniz/Dropbox/images/random/"):
+            for filename in filenames:
+                try:
+                    pics_list.append(unicode(strip_rank_from_title(filename)))
+                except:
+                    print "Failed to read filename:", filename, repr(filename)
+#exit()
+"""
 
 def make_dirs(target_dir):
     if not os.path.isdir(target_dir):
@@ -181,6 +213,7 @@ def save_image(image, file_path):
         for chunk in image.iter_content(1024):
             f.write(chunk)
     print u"Saved {}".format(file_path.split('/')[-1])
+    file_name = file_path.split('/')[-1]
     return True
 
 
@@ -272,7 +305,7 @@ def get_scrubbed_file_title(title, use_rank, rank=0):
     return file_title
 
 
-def get_target_file_path(url, file_title, subfolder=None):
+def get_target_file_path(url, file_title, subfolder=None, new_only=False):
     file_extension = get_extension(url)
     """
     if not has_acceptable_extension(url):
@@ -280,6 +313,7 @@ def get_target_file_path(url, file_title, subfolder=None):
         continue
     """
     file_title = u"{}.{}".format(file_title, file_extension)
+    clean_file_title = strip_rank_from_title(file_title)
     file_path = os.path.join(subreddit_target_dir, file_title)
     if subfolder:
         dir_path = os.path.join(subreddit_target_dir, subfolder)
@@ -358,7 +392,16 @@ for subreddit in subreddits:
         url = post['data']['url']
         rank += 1
 
+        if new_only and url in viewed_posts:
+            print "Image already viewed. See {}".format("viewed_posts.txt")
+            continue
+        with open("viewed_posts.txt", "a") as f:
+            f.write(url + "\n")
         title = post['data']['title']
+        """
+        if title in viewed_posts:
+            continue
+        """
         file_title = get_scrubbed_file_title(title, use_rank, rank=rank)
 
         if not has_extension(url):
@@ -371,13 +414,17 @@ for subreddit in subreddits:
                     list_item = 0
                     for url in url_list:
                         list_item += 1
+                        if hasattr(config, 'subdir_limit') and list_item > config.subdir_limit:
+                            print "Stopped after {} images.".format(list_item - 1)
+                            break
                         if not url:
                             print "Error: URL in list is empty."
                             continue
                         list_item_str = str(list_item).zfill(3)
                         new_file_title = file_title +  " - {}".format(list_item_str)
-                        file_path = get_target_file_path(url, new_file_title, file_title)
-                        save_image_from_url(url, file_path)
+                        file_path = get_target_file_path(url, new_file_title, file_title, new_only=new_only)
+                        if file_path:
+                            save_image_from_url(url, file_path)
                     continue
                 url = get_single_image_url_from_imgur(url)
             elif "gfycat" in url:
@@ -386,19 +433,24 @@ for subreddit in subreddits:
                     continue
                 if len(url_list) == 1:
                     url = url_list[0]
-                    file_path = get_target_file_path(url, file_title)
-                    save_image_from_url(url, file_path)
+                    file_path = get_target_file_path(url, file_title, new_only=new_only)
+                    if file_path:
+                        save_image_from_url(url, file_path)
                     continue
                 list_item = 0
                 for url in url_list:
                     list_item += 1
+                    if hasattr(config, 'subdir_limit') and list_item > config.subdir_limit:
+                        print "Stopped after {} images.".format(list_item)
+                        break
                     if not url:
                         print "Error: URL in list is empty."
                         continue
                     list_item_str = str(list_item).zfill(3)
                     new_file_title = file_title +  " - {}".format(list_item_str)
-                    file_path = get_target_file_path(url, new_file_title, file_title)
-                    save_image_from_url(url, file_path)
+                    file_path = get_target_file_path(url, new_file_title, file_title, new_only=new_only)
+                    if file_path:
+                        save_image_from_url(url, file_path)
                 continue
             else:
                 print u"\"{}\" at {} is not a directly-hosted image or is not a single image on imgur.".format(title, url)
@@ -406,9 +458,9 @@ for subreddit in subreddits:
 
         if not url:
             continue
-        file_path = get_target_file_path(url, file_title)
-        save_image_from_url(url, file_path)
-
+        file_path = get_target_file_path(url, file_title, new_only=new_only)
+        if file_path:
+            save_image_from_url(url, file_path)
 
 if failed_downloads:
     print "\nThe following downloads failed: ------"
@@ -423,4 +475,9 @@ if missing_pictures:
 if failed_subreddits:
     print "\nThe following subreddits failed: ------"
     for subreddit in failed_subreddits:
+        print subreddit
+
+if failed_saves:
+    print "\nThe following saves failed: ------"
+    for save in failed_saves:
         print subreddit

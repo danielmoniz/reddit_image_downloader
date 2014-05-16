@@ -1,3 +1,4 @@
 config.py
 *.pyc
 test
+viewed_posts.txt
