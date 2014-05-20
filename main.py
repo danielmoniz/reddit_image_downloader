@@ -8,7 +8,10 @@ import re
 import requests
 import bs4
 
+import utils
 import config
+
+root_dir = os.path.dirname(os.path.realpath(__file__))
 
 subreddits = config.subreddits
 
@@ -81,10 +84,11 @@ def strip_rank_from_title(title):
     return title.lstrip("0123456789. ")
 
 viewed_posts = []
-open("viewed_posts.txt", 'a').close()
-with open("viewed_posts.txt", 'r') as f:
+viewed_posts_path = os.path.join(root_dir, "viewed_posts.txt")
+open(viewed_posts_path, 'a').close()
+with open(viewed_posts_path, 'r') as f:
     viewed_posts = f.read().split('\n')
-with open("viewed_posts.txt", "a") as f:
+with open(viewed_posts_path, "a") as f:
     f.write("\n{}\nDate/time started: {}\n".format("*"*16, datetime.datetime.now()))
 
 
@@ -157,33 +161,6 @@ def get_count_updated_request(count, target_url_template, subreddit, options):
     final_post_name = post_list[final_count - 1]['data']['name']
 
     return final_post_name
-
-def has_extension(url):
-    if url[-4] == '.' or url[-5] == '.':
-        return True
-    return False
-
-def get_extension(url):
-    uri = url.split('/')[-1]
-    try:
-        extension_start = uri.index('.')
-    except ValueError:
-        return False
-    extension = uri[extension_start + 1:]
-    # remove extra url arguments
-    try:
-        extension_end = extension.index('?')
-        extension = extension[:extension_end]
-    except ValueError:
-        pass
-    return extension
-
-def has_acceptable_extension(url):
-    """Assumes url has an extension."""
-    extension = get_extension(url)
-    if extension in ["jpg", "jpeg", "gif", "png"]:
-        return True
-    return False
 
 def make_reddit_request(target_url):
     headers = { 'User-Agent': 'reddit image downloader/0.1 by ParagonRG' }
@@ -306,9 +283,9 @@ def get_scrubbed_file_title(title, use_rank, rank=0):
 
 
 def get_target_file_path(url, file_title, subfolder=None, new_only=False):
-    file_extension = get_extension(url)
+    file_extension = utils.get_extension(url)
     """
-    if not has_acceptable_extension(url):
+    if not utils.has_acceptable_extension(url):
         print "Not an accepted extension."
         continue
     """
@@ -404,7 +381,7 @@ for subreddit in subreddits:
         """
         file_title = get_scrubbed_file_title(title, use_rank, rank=rank)
 
-        if not has_extension(url):
+        if not utils.has_extension(url):
             if "imgur" in url:
                 # check if album - if so, move on immediately
                 if 'a' in url.rsplit('/'):
@@ -477,7 +454,3 @@ if failed_subreddits:
     for subreddit in failed_subreddits:
         print subreddit
 
-if failed_saves:
-    print "\nThe following saves failed: ------"
-    for save in failed_saves:
-        print subreddit
