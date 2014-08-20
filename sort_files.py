@@ -8,14 +8,17 @@ def sort_files(path, filetype='gif'):
     Sort files into a specific folder while *not* maintaining existing 
     file structure patterns.
     """
-    target_dir = filetype.lower() + 's'
+    target_dir = "_{}s".format(filetype.lower())
     target = os.path.join(path, target_dir)
-    utils.make_dir(target)
     for root, dirnames, filenames in os.walk(path):
         for filename in filenames:
-            extension = utils.get_extension(filename)
+            if ".ds_store" in filename.lower():
+                continue
+            extension = utils.get_extension(filename).strip('.')
             if extension == filetype.lower():
-                os.rename(os.path.join(root, filename), os.path.join(target, filename))
+                utils.make_dir(target)
+                new_name = utils.find_untaken_name(filename, target)
+                os.rename(os.path.join(root, filename), os.path.join(target, new_name))
 
 def move_out_of_folders(path):
     """
@@ -23,7 +26,17 @@ def move_out_of_folders(path):
     """
     for root, dirnames, filenames in os.walk(path):
         for filename in filenames:
-            target = os.path.join(path, filename)
+            if root == path:
+                continue
+            if ".ds_store" in filename.lower():
+                print os.path.join(path, filename)
+                try:
+                    os.remove(os.path.join(path, filename))
+                except OSError:
+                    pass
+                continue
+            new_name = utils.find_untaken_name(filename, path)
+            target = os.path.join(path, new_name)
             os.rename(os.path.join(root, filename), target)
 
 def remove_folders(path):
@@ -38,8 +51,20 @@ def remove_folders(path):
             """
             contained_files = os.walk(target, topdown=False)
             next_item = next(contained_files, (None, None, None))[2]
-            if not next_item:
+            print dirname
+            print next_item
+            if not next_item or '.DS_Store' in next_item:
                 shutil.rmtree(target)
+
+def remove_unique_indicators(path):
+    print path
+    for filename in os.listdir(path):
+        if ' (2)' in filename:
+            index = filename.index(' (2)')
+            extension = utils.get_extension(filename, with_dot=True)
+            shorter_filename = filename[:index] + extension
+            print filename
+            os.rename(os.path.join(path, filename), os.path.join(path, shorter_filename))
 
 
 if __name__ == "__main__":
@@ -51,3 +76,6 @@ if __name__ == "__main__":
     remove_folders(root_dir)
     sort_files(root_dir, 'gif')
     sort_files(root_dir, 'mp4')
+    sort_files(root_dir, 'html')
+    # TEST ONLY
+    #remove_unique_indicators(os.path.join(root_dir, '_gifs'))

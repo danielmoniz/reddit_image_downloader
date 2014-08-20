@@ -3,7 +3,7 @@ import os
 def get_extension(url, with_dot=False):
     uri = url.split('/')[-1]
     try:
-        extension_start = uri.index('.')
+        extension_start = len(uri) - uri[::-1].index('.') - 1
     except ValueError:
         return False
     add = 1
@@ -26,7 +26,6 @@ def find_untaken_name(filename, path, num=None):
     if num and num > 1:
         extension = get_extension(filename, with_dot=True)
         extension_position = filename.index(extension)
-        print extension
         temp_filename = filename[:extension_position] + " ({})".format(num) + filename[extension_position:]
     if temp_filename not in filenames:
         return temp_filename

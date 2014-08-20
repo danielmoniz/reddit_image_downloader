@@ -1,0 +1,3 @@
+title=Reddit Image Downloader
+author=Daniel M
+orientation=portrait
