@@ -185,7 +185,7 @@ def get_images_from_urls(urls, file_title, subreddit_target_dir, new_only, subdi
 
 def get_scrubbed_file_title(title, use_rank, rank=0):
     file_title = re.sub("[_.,]", '', title)[:50]
-    file_title = re.sub("[/ ]", '_', title)[:50]
+    file_title = re.sub("[/]", '_', title)[:50]
     if use_rank:
         rank_string = str(rank).zfill(3)
         file_title = u"{}. {}".format(rank_string, file_title)
