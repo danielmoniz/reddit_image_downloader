@@ -411,16 +411,16 @@ def get_images(args=None):
                     # check if album - if so, move on immediately
                     if 'a' in url.rsplit('/'):
                         urls = get_image_urls_from_imgur_album(url)
-                        get_images_from_urls(urls, file_title, subreddit_target_dir, new_only)
-                        continue
-                    urls = [get_single_image_url_from_imgur(url)]
+                    else:
+                        urls = [get_single_image_url_from_imgur(url)]
                 elif "gfycat" in url:
                     urls = get_videos_from_gfycat(url)
-                    get_images_from_urls(urls, file_title, subreddit_target_dir, new_only)
-                    continue
                 else:
                     print u"\"{}\" at {} is not a directly-hosted image or is not a single image on imgur.".format(title, url)
                     continue
+
+                get_images_from_urls(urls, file_title, subreddit_target_dir, new_only)
+                continue
 
             if not url:
                 continue
