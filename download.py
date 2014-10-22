@@ -102,7 +102,7 @@ def get_single_image_url_from_imgur(url):
     image_div = imgur_soup.find("div", {"class": "image" })
     try:
         url = "http:" + image_div.find('img')['src']
-    except AttributeError:
+    except (AttributeError, TypeError):
         print "Page cannot be read. Skipping."
         return False
     return url
