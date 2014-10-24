@@ -126,7 +126,7 @@ def get_image_urls_from_imgur_album(url):
     for image_div in image_divs:
         try:
             url = "http:" + image_div.find('img')['data-src']
-        except AttributeError:
+        except (AttributeError, TypeError):
             print "Current image cannot be read. Skipping."
             # skip current image on page
             continue
