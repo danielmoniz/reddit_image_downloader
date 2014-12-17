@@ -74,6 +74,9 @@ def save_image(image, file_path):
 
 
 def get_videos_from_gfycat(url):
+    print "-----------"
+    print url
+    print "-----------"
     gfycat_html = requests.get(url).text
     gfycat_soup = bs4.BeautifulSoup(gfycat_html)
     video_tags = gfycat_soup.find_all("video", {"class": "gfyVid" })
@@ -99,7 +102,12 @@ def get_single_image_url_from_imgur(url):
         return False
     imgur_html = requests.get(url).text
     imgur_soup = bs4.BeautifulSoup(imgur_html)
-    image_div = imgur_soup.find("div", {"class": "image" })
+
+    if ".gifv" in url:
+        image_div = imgur_soup.find("div", {"class": "video-container" })
+    else:
+        image_div = imgur_soup.find("div", {"class": "image" })
+
     try:
         url = "http:" + image_div.find('img')['src']
     except (AttributeError, TypeError):
@@ -123,18 +131,15 @@ def get_image_urls_from_imgur_album(url):
     image_divs = imgur_soup.find_all("div", {"class": "image" })
     urls = []
     print "Retrieving urls from page..."
+
     for image_div in image_divs:
         try:
             url = "http:" + image_div.find('img')['data-src']
-        except (AttributeError, TypeError):
-            print "Current image cannot be read. Skipping."
-            # skip current image on page
-            continue
-        except KeyError:
+        except (AttributeError, TypeError, KeyError):
             # Could be the other (click-through) type of album.
             url = 'test'
             standard_album_type = False
-            break
+            continue
         urls.append(url)
 
     if not standard_album_type:
@@ -142,7 +147,13 @@ def get_image_urls_from_imgur_album(url):
         image_wrapper = imgur_soup.find("div", {"class": "thumbs-carousel"})
         images = image_wrapper.find_all("img")
         for image in images:
-            url = "http:" + image['data-src']
+            try:
+                url = "http:" + image['data-src']
+            except (AttributeError, TypeError, KeyError):
+                print "Current image cannot be read. Skipping."
+                # skip current image on page
+                continue
+
             # Strip 's' from filename - it makes image small
             uri = url.split('/')[-1]
             uri_split = uri.split('.')
@@ -151,7 +162,7 @@ def get_image_urls_from_imgur_album(url):
             urls.append(url)
     return urls
 
-def get_images_from_urls(urls, file_title, subreddit_target_dir, new_only, subdir_limit=None, start_at=0):
+def get_images_from_urls(urls, post_url, file_title, subreddit_target_dir, new_only, subdir_limit=None, start_at=0):
     """Takes a list of urls. If the list has only one item, the file path 
     is created differently.
     """
@@ -182,6 +193,11 @@ def get_images_from_urls(urls, file_title, subreddit_target_dir, new_only, subdi
         print file_path
         if file_path:
             save_image_from_url(url, file_path)
+
+
+    if post_url not in viewed_posts:
+        with open(viewed_posts_path, "a") as f:
+            f.write(post_url + "\n")
 
 def get_scrubbed_file_title(title, use_rank, rank=0):
     file_title = re.sub("[_.,]", '', title)[:50]
@@ -226,6 +242,10 @@ def save_image_from_url(url, file_path):
     if not image:
         return False
     save_image(image, file_path)
+
+    if url not in viewed_posts:
+        with open(viewed_posts_path, "a") as f:
+            f.write(url + "\n")
 
 def get_cmd_line_args():
     parser = argparse.ArgumentParser(description="Pull image files from reddit.")
@@ -395,14 +415,12 @@ def get_images(args=None):
             json_data = reddit_request.json()
         for post in json_data['data']['children']:
             url = post['data']['url']
+            post_url = url;
             rank += 1
 
             if new_only and url in viewed_posts:
-                print "Image already viewed. See {}".format("viewed_posts.txt")
+                print "Image or album already viewed. See {}".format("viewed_posts.txt")
                 continue
-            if url not in viewed_posts:
-                with open(viewed_posts_path, "a") as f:
-                    f.write(url + "\n")
             title = post['data']['title']
             file_title = get_scrubbed_file_title(title, use_rank, rank=rank)
 
@@ -419,7 +437,7 @@ def get_images(args=None):
                     print u"\"{}\" at {} is not a directly-hosted image or is not a single image on imgur.".format(title, url)
                     continue
 
-                get_images_from_urls(urls, file_title, subreddit_target_dir, new_only)
+                get_images_from_urls(urls, post_url, file_title, subreddit_target_dir, new_only)
                 continue
 
             if not url:
