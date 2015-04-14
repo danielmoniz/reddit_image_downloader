@@ -33,6 +33,7 @@ def get_count_updated_request(count, target_url_template, subreddit, options):
         count_options_string = options_string_template.format(**count_options)
         target_url = target_url_template.format(subreddit, sort, count_options_string)
         reddit_request = make_reddit_request(target_url)
+        print reddit_request
         json_stuff = reddit_request.json()
         latest_post_name = reddit_request.json()['data']['after']
         post_list = reddit_request.json()['data']['children']
@@ -53,7 +54,7 @@ def download_image(image_url):
     except requests.exceptions.HTTPError:
         print "No image at this location: {}".format(image_url)
         return
-    except requests.exceptions.ConnectionError, socket.error:
+    except (requests.exceptions.ConnectionError, socket.error):
         print "Failed to download. URL is: {}".format(image_url)
         failed_downloads.append(image_url)
         return
@@ -94,6 +95,7 @@ def get_videos_from_gfycat(url):
         urls.append(url)
     return urls
 
+
 def get_single_image_url_from_imgur(url):
     print "Redirecting to imgur...",
     print "URL:", url
@@ -105,14 +107,20 @@ def get_single_image_url_from_imgur(url):
 
     if ".gifv" in url:
         image_div = imgur_soup.find("div", {"class": "video-container" })
+        try:
+            #url = "http:" + image_div.find('video', {"type": "video/mp4"})['src']
+            url = "http:" + image_div.find('source', {"type": "video/mp4"})['src']
+        except (AttributeError, TypeError):
+            print "Page cannot be read. Skipping."
+            return False
     else:
         image_div = imgur_soup.find("div", {"class": "image" })
+        try:
+            url = "http:" + image_div.find('img')['src']
+        except (AttributeError, TypeError):
+            print "Page cannot be read. Skipping."
+            return False
 
-    try:
-        url = "http:" + image_div.find('img')['src']
-    except (AttributeError, TypeError):
-        print "Page cannot be read. Skipping."
-        return False
     return url
 
 
@@ -145,6 +153,10 @@ def get_image_urls_from_imgur_album(url):
     if not standard_album_type:
         # try alternatie album type - click-through album
         image_wrapper = imgur_soup.find("div", {"class": "thumbs-carousel"})
+        if not image_wrapper:
+            print "Cannot find images on imgur album"
+            print url
+            return []
         images = image_wrapper.find_all("img")
         for image in images:
             try:
@@ -443,6 +455,12 @@ def get_images(args=None):
             if not url:
                 continue
             file_path = get_target_file_path(url, file_title, subreddit_target_dir, new_only=new_only)
+
+            if ('gifv' in url.split('.')):
+                if ("imgur" in url.split('/')):
+                    url = get_single_image_url_from_imgur(url)
+                    file_path = file_path.replace('.gifv', '.mp4')
+
             if file_path:
                 save_image_from_url(url, file_path)
 

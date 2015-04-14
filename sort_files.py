@@ -77,5 +77,6 @@ if __name__ == "__main__":
     sort_files(root_dir, 'gif')
     sort_files(root_dir, 'mp4')
     sort_files(root_dir, 'html')
+    sort_files(root_dir, 'gifv')
     # TEST ONLY
     #remove_unique_indicators(os.path.join(root_dir, '_gifs'))
