@@ -33,10 +33,10 @@ def get_count_updated_request(count, target_url_template, subreddit, options):
         count_options_string = options_string_template.format(**count_options)
         target_url = target_url_template.format(subreddit, sort, count_options_string)
         reddit_request = make_reddit_request(target_url)
-        print reddit_request
-        json_stuff = reddit_request.json()
-        latest_post_name = reddit_request.json()['data']['after']
-        post_list = reddit_request.json()['data']['children']
+        json_data = reddit_request.json
+
+        latest_post_name = json_data['data']['after']
+        post_list = json_data['data']['children']
 
     final_post_name = post_list[final_count - 1]['data']['name']
 
@@ -457,7 +457,7 @@ def get_images(args=None):
             file_path = get_target_file_path(url, file_title, subreddit_target_dir, new_only=new_only)
 
             if ('gifv' in url.split('.')):
-                if ("imgur" in url.split('/')):
+                if ("imgur" in url):
                     url = get_single_image_url_from_imgur(url)
                     file_path = file_path.replace('.gifv', '.mp4')
 
