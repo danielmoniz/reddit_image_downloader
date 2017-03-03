@@ -87,11 +87,13 @@ def get_videos_from_gfycat(url):
         try:
             source_tag = video_tag.find('source', {"id": "mp4source"})
             url = source_tag['src']
-            url = "http:" + url
+            if not url.startswith('http'):
+                url = "http:" + url
         except AttributeError:
             print "Current image cannot be read. Skipping."
             # skip current image on page
             continue
+        print "url:", url
         urls.append(url)
     return urls
 
@@ -189,6 +191,7 @@ def get_images_from_urls(urls, post_url, file_title, subreddit_target_dir, new_o
     if subdir_limit is None and hasattr(config, 'subdir_limit'):
         subdir_limit = config.subdir_limit
     for url in urls[start_at:]:
+        print "url:", url
         list_item += 1
         if list_item > subdir_limit and subdir_limit > 0:
             print "Stopped after {} images.".format(list_item)
@@ -196,6 +199,7 @@ def get_images_from_urls(urls, post_url, file_title, subreddit_target_dir, new_o
         if not url:
             print "Error: URL in list is empty."
             continue
+
         if len(urls) > 1:
             list_item_str = str(list_item).zfill(3)
             new_file_title = file_title +  " - {}".format(list_item_str)
@@ -212,8 +216,9 @@ def get_images_from_urls(urls, post_url, file_title, subreddit_target_dir, new_o
             f.write(post_url + "\n")
 
 def get_scrubbed_file_title(title, use_rank, rank=0):
-    file_title = re.sub("[_.,]", '', title)[:50]
-    file_title = re.sub("[/]", '_', title)[:50]
+    max_length = 70
+    file_title = re.sub("[_.,]", '', title)[:max_length]
+    file_title = re.sub("[/]", '_', title)[:max_length]
     if use_rank:
         rank_string = str(rank).zfill(3)
         file_title = u"{}. {}".format(rank_string, file_title)
@@ -443,7 +448,9 @@ def get_images(args=None):
                         urls = get_image_urls_from_imgur_album(url)
                     else:
                         urls = [get_single_image_url_from_imgur(url)]
+                    print "using imgur:"
                 elif "gfycat" in url:
+                    print "using gfycat:"
                     urls = get_videos_from_gfycat(url)
                 else:
                     print u"\"{}\" at {} is not a directly-hosted image or is not a single image on imgur.".format(title, url)
