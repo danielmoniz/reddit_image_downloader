@@ -80,12 +80,12 @@ def get_videos_from_gfycat(url):
     print "-----------"
     gfycat_html = requests.get(url).text
     gfycat_soup = bs4.BeautifulSoup(gfycat_html)
-    video_tags = gfycat_soup.find_all("video", {"class": "gfyVid" })
+    video_tags = gfycat_soup.find_all("video", {"class": "share-video" })
     urls = []
     print "Retrieving urls from page..."
     for video_tag in video_tags:
         try:
-            source_tag = video_tag.find('source', {"id": "mp4source"})
+            source_tag = video_tag.find('source', {"id": "mp4Source"})
             url = source_tag['src']
             if not url.startswith('http'):
                 url = "http:" + url
@@ -177,7 +177,7 @@ def get_image_urls_from_imgur_album(url):
     return urls
 
 def get_images_from_urls(urls, post_url, file_title, subreddit_target_dir, new_only, subdir_limit=None, start_at=0):
-    """Takes a list of urls. If the list has only one item, the file path 
+    """Takes a list of urls. If the list has only one item, the file path
     is created differently.
     """
     if not urls:
@@ -356,7 +356,7 @@ def make_dirs(target_dir):
         os.makedirs(target_dir)
 
 make_dirs(target_dir)
-    
+
 print "-" * 50
 
 #print "Looking for files of type {}.".format(file_type)
